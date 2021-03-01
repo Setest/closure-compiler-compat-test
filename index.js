@@ -30,7 +30,7 @@ if (fsExtra.pathExists()) {
 
 
 const compatTableModule = path.relative('./', path.dirname(require.resolve(compatTableModuleName)));
-if (!compatTableModule){
+if (!compatTableModule) {
     console.error(compatTableModuleName + ' module not installed!');
     return;
 }
@@ -104,7 +104,7 @@ function createReport(name = '', data = []) {
             header: 'Name',
             key: 'name',
             width: 32,
-            style: {font:{bold: true, size: 12}},
+            style: {font: {bold: true, size: 12}},
         },
         {
             header: 'Error',
@@ -130,39 +130,39 @@ function createReport(name = '', data = []) {
         }
     }
 
-    worksheet.getRow(1).font = { size: 14, bold: true };
+    worksheet.getRow(1).font = {size: 14, bold: true};
 
     worksheet.columns = columns
 
-    let defaultAlignment = { wrapText: true, vertical: 'top', horizontal: 'left' };
+    let defaultAlignment = {wrapText: true, vertical: 'top', horizontal: 'left'};
     data.forEach(currentTest => {
         currentTest.error = currentTest.error.length ? currentTest.error : '';
         currentTest.warning = currentTest.warning.length ? currentTest.warning : '';
 
         let newRow = worksheet.addRow(currentTest);
 
-        newRow.getCell(2).alignment = { vertical: 'middle', horizontal: 'center' };
-        newRow.getCell(3).alignment = { wrapText: true, vertical: 'middle', horizontal: 'left' };
+        newRow.getCell(2).alignment = {vertical: 'middle', horizontal: 'center'};
+        newRow.getCell(3).alignment = {wrapText: true, vertical: 'middle', horizontal: 'left'};
 
-        if (currentTest.error.length){
+        if (currentTest.error.length) {
             newRow.getCell(2).fill = {
                 type: 'pattern',
-                pattern:'solid',
-                fgColor:{argb:'EA5151'},
+                pattern: 'solid',
+                fgColor: {argb: 'EA5151'},
             };
 
             newRow.getCell(4).fill = {
                 type: 'pattern',
-                pattern:'solid',
-                fgColor:{argb:'EA5151'},
+                pattern: 'solid',
+                fgColor: {argb: 'EA5151'},
             };
         }
 
-        if (currentTest.warning.length){
+        if (currentTest.warning.length) {
             newRow.getCell(5).fill = {
                 type: 'pattern',
-                pattern:'solid',
-                fgColor:{argb:'FDFFA6'},
+                pattern: 'solid',
+                fgColor: {argb: 'FDFFA6'},
             };
         }
 
@@ -272,9 +272,9 @@ function runTest(parents, test, sublevel, testFileName) {
                 //     console.error('x', x);
                 // })
             )
-        }else{
+        } else {
             exec(compilerExecuteCmd, function (error, stdout, stderr) {
-                analyze({data:stdout, testPath, testFileName, hashFileName, code, hash})
+                analyze({data: stdout, testPath, testFileName, hashFileName, code, hash})
             });
         }
 
