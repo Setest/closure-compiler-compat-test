@@ -1,0 +1,16 @@
+node_modules
+es*/compilers/*
+.DS_Store
+.ruby-version
+_site/
+.idea/
+.vscode/
+compilers/*.jar
+config.json
+tmp/*
+reports/*
+
+# Only apps should have lockfiles
+npm-shrinkwrap.json
+package-lock.json
+yarn.lock

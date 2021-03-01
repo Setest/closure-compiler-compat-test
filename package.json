@@ -1,0 +1,21 @@
+{
+  "name": "google-clouse-compiler-compat-test",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "Stepan Prishepenko",
+  "license": "ISC",
+  "dependencies": {
+    "compat-table": "github:kangax/compat-table",
+    "exceljs": "^4.2.0",
+    "fs-extra": "^9.1.0",
+    "google-closure-compiler": "^20210202.0.0",
+    "md5": "^2.3.0",
+    "stringify-object": "^3.3.0"
+  },
+  "devDependencies": {},
+  "keywords": [],
+  "description": ""
+}
