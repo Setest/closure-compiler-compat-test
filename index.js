@@ -75,15 +75,6 @@ fs.readdirSync(compatTableModule).forEach(function (filename) {
     }).catch(err => console.log(err));
 });
 
-// todo^
-// - вынести запуск тестов в отд функцию
-// - доб в конфиг разд не синхронный и асинхронный запуск
-// + проверить работу саб тестов
-// - раскрасить отчет, варнинги и ерроры разным цетом
-// - написать маке файл
-//  - make install накатывает сверху пакет с данными, npm install каждого своего пакета отдельно
-//  - make create создает отчеты
-
 function createReport(name = '', data = []) {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Me';
@@ -198,26 +189,59 @@ function execPromise(command) {
     });
 }
 
+function analyze({data = '[]', testPath = '', testFileName = '', hashFileName = '', code = '', hash = ''}) {
+    let success = true;
+    let result = {
+        name: testPath,
+        hashFileName,
+        code,
+        hash,
+        error: [],
+        warning: []
+    };
+    if (data) {
+        // console.log(`stdout: ${stdout}`, stdout);
+        data = JSON.parse(data);
+        if (Array.isArray(data) && data.length > 1) {
+            success = false;
+            data.forEach(function (msg) {
+                if (!['info'].includes(msg.level)) {
+                    result[msg.level].push(msg);
+                    // a[msg.level].push(beautify(msg, null, 2, 80));
+                    // a[msg.level].push(stringifyObject(msg, {
+                    //     indent: '  ',
+                    //     singleQuotes: false
+                    // }));
+                }
+            })
+        }
+    }
+    result.success = success;
+    testsResult[testFileName].push(result);
+    console.log(`${testCount}/${totalAmount} ${(success ? 'success' : 'ERROR')} - ${testPath}`);
+    testCount++;
+}
+
 // Run test / subtests, recursively.  Report results, indicate data files
 // which are out of date.
 function runTest(parents, test, sublevel, testFileName) {
-    var testPath = parents.join(' -> ') + ' -> ' + test.name;
+    let testPath = parents.join(' -> ') + ' -> ' + test.name;
     testsResult[testFileName] = testsResult[testFileName] || [];
 
     if (typeof test.exec === 'function') {
-        var src = test.exec.toString();
-        var m = /^function\s*\w*\s*\(.*?\)\s*\{\s*\/\*([\s\S]*?)\*\/\s*\}$/m.exec(src);
-        var evalcode;
+        let src = test.exec.toString();
+        let m = /^function\s*\w*\s*\(.*?\)\s*\{\s*\/\*([\s\S]*?)\*\/\s*\}$/m.exec(src);
+        let code;
         if (m) {
-            evalcode = '(function test() {' + m[1] + '})();';
+            code = '(function test() {' + m[1] + '})();';
         } else {
-            evalcode = '(' + src + ')()';
+            code = '(' + src + ')()';
         }
-        // console.log(testPath);
 
         let hash = md5(testPath);
         let hashFileName = tmpFolderPath + hash + '.js';
-        fs.writeFileSync(hashFileName, evalcode);
+
+        fs.writeFileSync(hashFileName, code);
 
 
         // более элегантное решение это использовать NPM пакет, но тогда надо в промисы оборачивать
@@ -237,49 +261,26 @@ function runTest(parents, test, sublevel, testFileName) {
 
 
         // ' --languageIn=ECMASCRIPT6 --languageOut=ECMASCRIPT5 --rewritePolyfills --warningLevel=QUIET'
-        promises.push(
-            execPromise(`java -jar ${compilersPath}${config.compilerBinaryFileName} --js ${hashFileName} --error_format JSON  --compilation_level ADVANCED --checks_only`)
-            .then(function (stdout, error) {
-                let success = true;
-                let a = {
-                    name: testPath,
-                    hashFileName,
-                    code: evalcode,
-                    hash,
-                    error: [],
-                    warning: []
-                };
-                if (stdout) {
-                    // console.log(`stdout: ${stdout}`, stdout);
-                    let result = JSON.parse(stdout);
-                    if (Array.isArray(result) && result.length > 1) {
-                        success = false;
-                        result.forEach(function (msg) {
-                            if (!['info'].includes(msg.level)) {
-                                a[msg.level].push(msg);
-                                // a[msg.level].push(beautify(msg, null, 2, 80));
-                                // a[msg.level].push(stringifyObject(msg, {
-                                //     indent: '  ',
-                                //     singleQuotes: false
-                                // }));
-                            }
-                        })
-                    }
-                }
-                a.success = success;
-                testsResult[testFileName].push(a);
-                console.log(`${testCount}/${totalAmount} ${(success ? 'success' : 'ERROR')} - ${testPath}`);
-                testCount++;
-            })
-            // .catch(function(e, x) {
-            //     console.error('e', e.message);
-            //     console.error('x', x);
-            // })
-        );
+        let compilerExecuteCmd = `java -jar ${compilersPath}${config.compilerBinaryFileName} --js ${hashFileName} --error_format JSON  --compilation_level ADVANCED --checks_only`;
+        if (config.async) {
+            promises.push(
+                execPromise(compilerExecuteCmd)
+                    .then((data) => analyze({data, testPath, testFileName, hashFileName, code, hash})
+                    )
+                // .catch(function(e, x) {
+                //     console.error('e', e.message);
+                //     console.error('x', x);
+                // })
+            )
+        }else{
+            exec(compilerExecuteCmd, function (error, stdout, stderr) {
+                analyze({data:stdout, testPath, testFileName, hashFileName, code, hash})
+            });
+        }
 
     }
     if (test.subtests) {
-        var newParents = parents.slice(0);
+        let newParents = parents.slice(0);
         newParents.push(test.name);
         test.subtests.forEach(function (v) {
             runTest(newParents, v, sublevel + 1, testFileName);
