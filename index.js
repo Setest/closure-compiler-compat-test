@@ -89,8 +89,10 @@ const asyncTestHelperTail =
     '\n' +
     'function onCloseAsyncCheck() {\n' +
     '  if (!asyncPassed) {\n' +
+    '    testIsFailture();\n' +
+    // '    console.error("Async[FAILURE]");\n' +
     // '    print("Async[FAILURE]");\n' +
-    '    throw "Async check failed";\n' +
+    // '    throw "Async check failed";\n' +
     '  }\n' +
     // '  print("[SUCCESS]");\n' +
     '}\n';
@@ -276,12 +278,16 @@ function analyze({data = '[]', testPath = '', testFileName = '', hashFileName = 
         warning: []
     };
     if (data) {
-        // console.log(`stdout: ${stdout}`, stdout);
+        // console.log(data);
         data = JSON.parse(data);
         if (Array.isArray(data) && data.length > 1) {
             success = false;
             data.forEach(function (msg) {
                 if (!['info'].includes(msg.level)) {
+                    if (msg.description.includes('testIsFailture') && data.length == 2){
+                        success = true;
+                        return;
+                    }
                     result[msg.level].push(msg);
                     // a[msg.level].push(beautify(msg, null, 2, 80));
                     // a[msg.level].push(stringifyObject(msg, {
@@ -301,14 +307,8 @@ function analyze({data = '[]', testPath = '', testFileName = '', hashFileName = 
 function prepareCode(src){
 
     let m = /^function\s*\w*\s*\(.*?\)\s*\{\s*\/\*([\s\S]*?)\*\/\s*\}$/m.exec(src);
-    let code;
+    let evalcode;
     let script = '';
-
-    // if (m) {
-    //     code = '(function test() {' + m[1] + '})();';
-    // } else {
-    //     code = '(' + src + ')()';
-    // }
 
     if (src.includes('__createIterableObject')) {
         script += createIterableHelper;
@@ -322,18 +322,20 @@ function prepareCode(src){
         if (m) {
             evalcode = '(function test() {' + m[1] + '})();';
         } else {
-            evalcode = '(' + src + ')()';
+            evalcode = '(' + src + ')();';
         }
 
-        // script += evalcode;
+        script += evalcode;
         script += 'var evalcode = ' + JSON.stringify(evalcode) + ';\n' +
             'try {\n' +
             '    var res = eval(evalcode);\n' +
             '    if (!res) { throw new Error("failed: " + res); }\n' +
             // '    print("[SUCCESS]");\n' +
             '} catch (e) {\n' +
+            '    testIsFailture()' +
+            // '    console.error("[FAILURE]");\n' +
             // '    print("[FAILURE]", e);\n' +
-            '    throw e;\n' +
+            // '    throw e;\n' +
             '}\n';
     }
     return script;
@@ -349,6 +351,7 @@ function runTest(parents, test, sublevel, testFileName) {
         let src = test.exec.toString();
 
         code = prepareCode(src);
+        // console.log(code);
 
         let hash = md5(testPath);
         let hashFileName = tmpFolderPath + hash + '.js';
