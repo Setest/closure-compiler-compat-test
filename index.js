@@ -21,6 +21,81 @@ const compatTableModuleName = "compat-table"
 let totalAmount = 0;
 let testCount = 1;
 
+const createIterableHelper =
+    'var global = this;\n' +
+    'global.__createIterableObject = function (arr, methods) {\n' +
+    '    methods = methods || {};\n' +
+    '    if (typeof Symbol !== "function" || !Symbol.iterator)\n' +
+    '      return {};\n' +
+    '    arr.length++;\n' +
+    '    var iterator = {\n' +
+    '      next: function() {\n' +
+    '        return { value: arr.shift(), done: arr.length <= 0 };\n' +
+    '      },\n' +
+    '      "return": methods["return"],\n' +
+    '      "throw": methods["throw"]\n' +
+    '    };\n' +
+    '    var iterable = {};\n' +
+    '    iterable[Symbol.iterator] = function(){ return iterator; };\n' +
+    '    return iterable;\n' +
+    '  };\n';
+
+const asyncTestHelperHead =
+    'var asyncPassed = false;\n' +
+    '\n' +
+    'function asyncTestPassed() {\n' +
+    '  asyncPassed = true;\n' +
+    '}\n' +
+    '\n' +
+    'function setTimeoutDisabled(cb, time, cbarg) {\n' +
+    '  if (!jobqueue[time]) {\n' +
+    '    jobqueue[time] = [];\n' +
+    '  }\n' +
+    '  jobqueue[time].push({cb, cbarg, startTime: Date.now(), timeout: time});\n' +
+    '}\n' +
+    '\n' +
+    'var jobqueue = [];\n';
+
+const asyncTestHelperTail =
+    'const thenCb = job => {\n' +
+    '  job.cb(job.cbarg)\n' +
+    '}\n' +
+    '\n' +
+    'const catchCb = job => {\n' +
+    '  jobRunner(job);\n' +
+    '}\n' +
+    '\n' +
+    'function jobRunner(job){\n' +
+    '  return new Promise((resolve, reject) => {\n' +
+    '    let diff = Date.now() - job.startTime;\n' +
+    '    if (diff >= job.timeout) {\n' +
+    '      if (!job.run) {\n' +
+    '        job.run = true;\n' +
+    '        resolve (job);\n' +
+    '      }\n' +
+    '    } else {\n' +
+    '      reject (job)\n' +
+    '    }\n' +
+    '  })\n' +
+    '  .then(thenCb)\n' +
+    '  .catch(catchCb)\n' +
+    '}\n' +
+    '\n' +
+    'jobqueue.forEach(function(jobs, index) {\n' +
+    '  for (var job of jobs) {\n' +
+    '    jobRunner(job);\n' +
+    '  }\n' +
+    '});\n' +
+    '\n' +
+    'function onCloseAsyncCheck() {\n' +
+    '  if (!asyncPassed) {\n' +
+    // '    print("Async[FAILURE]");\n' +
+    '    throw "Async check failed";\n' +
+    '  }\n' +
+    // '  print("[SUCCESS]");\n' +
+    '}\n';
+
+
 fsExtra.emptyDirSync(tmpFolderPath);
 
 if (fsExtra.pathExists()) {
@@ -223,6 +298,47 @@ function analyze({data = '[]', testPath = '', testFileName = '', hashFileName = 
     testCount++;
 }
 
+function prepareCode(src){
+
+    let m = /^function\s*\w*\s*\(.*?\)\s*\{\s*\/\*([\s\S]*?)\*\/\s*\}$/m.exec(src);
+    let code;
+    let script = '';
+
+    // if (m) {
+    //     code = '(function test() {' + m[1] + '})();';
+    // } else {
+    //     code = '(' + src + ')()';
+    // }
+
+    if (src.includes('__createIterableObject')) {
+        script += createIterableHelper;
+    } else if (src.includes('global')) {
+        script += 'var global = this;\n';
+    }
+
+    if (src.includes('asyncTestPassed')) {
+        script += asyncTestHelperHead + '(function test() {' + m[1] + '})();' + asyncTestHelperTail;
+    } else {
+        if (m) {
+            evalcode = '(function test() {' + m[1] + '})();';
+        } else {
+            evalcode = '(' + src + ')()';
+        }
+
+        // script += evalcode;
+        script += 'var evalcode = ' + JSON.stringify(evalcode) + ';\n' +
+            'try {\n' +
+            '    var res = eval(evalcode);\n' +
+            '    if (!res) { throw new Error("failed: " + res); }\n' +
+            // '    print("[SUCCESS]");\n' +
+            '} catch (e) {\n' +
+            // '    print("[FAILURE]", e);\n' +
+            '    throw e;\n' +
+            '}\n';
+    }
+    return script;
+}
+
 // Run test / subtests, recursively.  Report results, indicate data files
 // which are out of date.
 function runTest(parents, test, sublevel, testFileName) {
@@ -231,19 +347,13 @@ function runTest(parents, test, sublevel, testFileName) {
 
     if (typeof test.exec === 'function') {
         let src = test.exec.toString();
-        let m = /^function\s*\w*\s*\(.*?\)\s*\{\s*\/\*([\s\S]*?)\*\/\s*\}$/m.exec(src);
-        let code;
-        if (m) {
-            code = '(function test() {' + m[1] + '})();';
-        } else {
-            code = '(' + src + ')()';
-        }
+
+        code = prepareCode(src);
 
         let hash = md5(testPath);
         let hashFileName = tmpFolderPath + hash + '.js';
 
         fs.writeFileSync(hashFileName, code);
-
 
         // более элегантное решение это использовать NPM пакет, но тогда надо в промисы оборачивать
         // https://www.npmjs.com/package/google-closure-compiler
