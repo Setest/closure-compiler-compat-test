@@ -7,6 +7,7 @@ const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 const execSync = require('child_process').execSync;
 const ExcelJS = require('exceljs');
+// const ON_DEATH = require('death');
 
 // const stringifyObject = require('stringify-object');
 // const beautify = require("json-beautify");
@@ -20,6 +21,14 @@ const compilersPath = './compilers/'
 const compatTableModuleName = "compat-table"
 let totalAmount = 0;
 let testCount = 1;
+
+// Begin reading from stdin so the process does not exit imidiately
+// process.stdin.resume();
+// process.on('SIGINT', function() {
+//     console.log('Interrupted');
+//     process.exit();
+// });
+
 
 const createIterableHelper =
     'var global = this;\n' +
@@ -97,6 +106,11 @@ const asyncTestHelperTail =
     // '  print("[SUCCESS]");\n' +
     '}\n';
 
+ON_DEATH(function(signal, err) {
+    console.log('ok')
+//     // process.kill(process.pid, "SIGINT");
+    generateReports();
+})
 
 fsExtra.emptyDirSync(tmpFolderPath);
 
@@ -146,12 +160,15 @@ fs.readdirSync(compatTableModule).forEach(function (filename) {
 
 
     Promise.all(promises).then(() => {
-        for (let testName in testsResult) {
-            createReport(testName, testsResult[testName]);
-        }
-
+        generateReports();
     }).catch(err => console.log(err));
 });
+
+function generateReports(){
+    for (let testName in testsResult) {
+        createReport(testName, testsResult[testName]);
+    }
+};
 
 function createReport(name = '', data = []) {
     const workbook = new ExcelJS.Workbook();
@@ -307,7 +324,7 @@ function analyze({data = '[]', testPath = '', testFileName = '', hashFileName = 
 function prepareCode(src){
 
     let m = /^function\s*\w*\s*\(.*?\)\s*\{\s*\/\*([\s\S]*?)\*\/\s*\}$/m.exec(src);
-    let evalcode;
+    let evalcode = '';
     let script = '';
 
     if (src.includes('__createIterableObject')) {
@@ -383,7 +400,6 @@ function runTest(parents, test, sublevel, testFileName) {
                     )
                 // .catch(function(e, x) {
                 //     console.error('e', e.message);
-                //     console.error('x', x);
                 // })
             )
         } else {

@@ -17,3 +17,6 @@
     "tests" : ["data-es5", "data-es6"] // файлы тестов из папки node_modules/compat-table/
 }
 ```
+
+##### TODO
+- добавить сохранение отчета в синхронном режиме при отправки SIGINT, SIGTERM
