@@ -301,8 +301,10 @@ function analyze({data = '[]', testPath = '', testFileName = '', hashFileName = 
             success = false;
             data.forEach(function (msg) {
                 if (!['info'].includes(msg.level)) {
-                    if (msg.description.includes('testIsFailture') && data.length == 2){
-                        success = true;
+                    if (msg.description.includes('testIsFailture')){
+                        if (data.length == 2){
+                            success = true;
+                        }
                         return;
                     }
                     result[msg.level].push(msg);
