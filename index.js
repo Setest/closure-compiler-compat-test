@@ -5,6 +5,7 @@ const fsExtra = require('fs-extra')
 const config = require('./config.json');
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
+const execSync = require('child_process').execSync;
 const ExcelJS = require('exceljs');
 
 // const stringifyObject = require('stringify-object');
@@ -18,7 +19,7 @@ const reportsPath = './reports/'
 const compilersPath = './compilers/'
 const compatTableModuleName = "compat-table"
 let totalAmount = 0;
-let testCount = 0;
+let testCount = 1;
 
 fsExtra.emptyDirSync(tmpFolderPath);
 
@@ -261,7 +262,7 @@ function runTest(parents, test, sublevel, testFileName) {
 
 
         // ' --languageIn=ECMASCRIPT6 --languageOut=ECMASCRIPT5 --rewritePolyfills --warningLevel=QUIET'
-        let compilerExecuteCmd = `java -jar ${compilersPath}${config.compilerBinaryFileName} --js ${hashFileName} --error_format JSON  --compilation_level ADVANCED --checks_only`;
+        let compilerExecuteCmd = `java -jar ${compilersPath}${config.compilerBinaryFileName} --js ${hashFileName} --error_format JSON ${config.compilerOptions}`;
         if (config.async) {
             promises.push(
                 execPromise(compilerExecuteCmd)
@@ -273,9 +274,14 @@ function runTest(parents, test, sublevel, testFileName) {
                 // })
             )
         } else {
-            exec(compilerExecuteCmd, function (error, stdout, stderr) {
-                analyze({data: stdout, testPath, testFileName, hashFileName, code, hash})
-            });
+            let data = '';
+            // инфа по отлову ошибок https://stackoverflow.com/questions/30134236/use-child-process-execsync-but-keep-output-in-console
+            try{
+                data = execSync(compilerExecuteCmd + ' 2>&1').toString();
+            }catch (e) {
+                data = e.stdout.toString();
+            }
+            analyze({data, testPath, testFileName, hashFileName, code, hash})
         }
 
     }
