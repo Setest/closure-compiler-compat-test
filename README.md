@@ -1,3 +1,10 @@
+Test capabilities of Google Closure Compiler with modern ECMA script syntax.
+In a result it created XLS table which contain all features of ECMA script which
+is not provided by Google Closure Compiler.
+
+Its an old task and was created for discovered problem which invoked randomly
+in old fashion browsers after deploy.
+
 Тестирует прохождение через компилятор синтаксиса ECMA.
 
 #### Установка
